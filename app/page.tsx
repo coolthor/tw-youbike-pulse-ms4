@@ -1,59 +1,39 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 
-type Station = { id:string; name:string; area:string; address:string; total:number; bikes:number; docks:number; updatedAt:string; level:'ok'|'warn'|'bad'; label:string; };
-type Payload = { city:string; cityName:string; source:string; fetchedAt:string; count:number; summary:{problem:number;noBike:number;noDock:number;ok:number;eBikes:number}; stations:Station[] };
-
-type Stop = { name:string; keywords:string[] };
-const TOUR_ROUTES: {id:string; name:string; theme:string; tip:string; stops:Stop[]}[] = [
- {id:'old-town',name:'老城小吃',theme:'赤崁樓、孔廟、國華街一帶短程移動',tip:'先確認老城核心站點是否有車；熱門時段建議保留步行備案。',stops:[{name:'赤崁樓',keywords:['赤崁樓','民族路','赤崁']},{name:'孔子廟',keywords:['孔子廟','孔廟','南門路']},{name:'國華街',keywords:['國華','海安','中正路']},{name:'臺南美術館',keywords:['美術館','永福','府前路']}]},
- {id:'anping',name:'安平海風',theme:'安平古堡、樹屋、老街與水岸',tip:'安平站點距離較分散，出發前先看還車空位，避免騎到景點附近沒位。',stops:[{name:'安平古堡',keywords:['安平古堡','安平路']},{name:'安平樹屋',keywords:['安平樹屋','古堡街']},{name:'安平老街',keywords:['安平老街','延平街']},{name:'漁光島方向',keywords:['漁光','億載金城','光州路']}]},
- {id:'culture',name:'博物館文化',theme:'美術館、文學館、奇美與校園文化點',tip:'奇美/仁德區距離市中心較遠，適合確認附近有車後作為半日支線。',stops:[{name:'臺南美術館',keywords:['美術館','永福','府前路']},{name:'臺灣文學館',keywords:['文學館','中正路','湯德章']},{name:'臺南大學',keywords:['臺南大學','南大','健康路']},{name:'奇美博物館',keywords:['奇美','仁德','文華路']}]},
- {id:'station-core',name:'車站到市區',theme:'台南車站出發，接老城核心景點',tip:'適合剛到台南先看車站周邊可借數，再往中西區移動。',stops:[{name:'台南車站',keywords:['臺南車站','台南車站','火車站','前站']},{name:'中山公園',keywords:['中山公園','公園路']},{name:'成功大學',keywords:['成功大學','成大','大學路']},{name:'赤崁樓',keywords:['赤崁樓','民族路']}]}];
+type Station={id:string;name:string;area:string;address:string;total:number;bikes:number;docks:number;updatedAt:string;level:'ok'|'warn'|'bad';label:string};
+type Payload={city:string;cityName:string;source:string;fetchedAt:string;count:number;summary:{problem:number;noBike:number;noDock:number;ok:number;eBikes:number};stations:Station[]};
+type Stop={name:string;keywords:string[]};
+const MODES=['問題優先','只看問題','可借車多','可還位多'] as const;
+const TOUR_ROUTES:{id:string;name:string;theme:string;tip:string;stops:Stop[]}[]=[
+{id:'old-town',name:'老城小吃',theme:'赤崁樓、孔廟、國華街一帶',tip:'熱門時段先看老城核心站點有沒有車；沒車就改短距離步行。',stops:[{name:'赤崁樓',keywords:['赤崁樓','民族路','赤崁']},{name:'孔子廟',keywords:['孔子廟','孔廟','南門路']},{name:'國華街',keywords:['國華','海安','中正路']},{name:'臺南美術館',keywords:['美術館','永福','府前路']}]},
+{id:'anping',name:'安平海風',theme:'古堡、樹屋、老街與水岸',tip:'安平點位分散，出發前先確認目的地附近還車空位。',stops:[{name:'安平古堡',keywords:['安平古堡','安平路']},{name:'安平樹屋',keywords:['安平樹屋','古堡街']},{name:'安平老街',keywords:['安平老街','延平街']},{name:'漁光島方向',keywords:['漁光','億載金城','光州路']}]},
+{id:'culture',name:'博物館文化',theme:'美術館、文學館、校園文化點',tip:'奇美與仁德支線較遠，適合當半日路線，不要硬塞進老城散步。',stops:[{name:'臺南美術館',keywords:['美術館','永福','府前路']},{name:'臺灣文學館',keywords:['文學館','中正路','湯德章']},{name:'臺南大學',keywords:['臺南大學','南大','健康路']},{name:'奇美博物館',keywords:['奇美','仁德','文華路']}]},
+{id:'station-core',name:'車站進城',theme:'台南車站出發接市區核心',tip:'剛到台南先看車站周邊可借數，再決定往中西區或成大方向。',stops:[{name:'台南車站',keywords:['臺南車站','台南車站','火車站','前站']},{name:'中山公園',keywords:['中山公園','公園路']},{name:'成功大學',keywords:['成功大學','成大','大學路']},{name:'赤崁樓',keywords:['赤崁樓','民族路']}]}];
 
 export default function Page(){
- const [data,setData]=useState<Payload|null>(null);
- const [err,setErr]=useState('');
- const [q,setQ]=useState('');
- const [area,setArea]=useState('全部');
- const [mode,setMode]=useState('問題優先');
- const [city,setCity]=useState<'taipei'|'tainan'>('tainan');
-
- useEffect(()=>{let live=true; async function load(){try{setErr(''); const r=await fetch(`/api/youbike?city=${city}`,{cache:'no-store'}); if(!r.ok) throw new Error(String(r.status)); const j=await r.json(); if(live)setData(j)}catch(e){if(live)setErr(String(e))}} load(); const t=setInterval(load,60000); return()=>{live=false; clearInterval(t)}},[city]);
-
+ const [data,setData]=useState<Payload|null>(null),[err,setErr]=useState(''),[q,setQ]=useState(''),[area,setArea]=useState('全部'),[mode,setMode]=useState<typeof MODES[number]>('問題優先'),[city,setCity]=useState<'taipei'|'tainan'>('tainan'),[selectedRoute,setSelectedRoute]=useState('全部路線'),[updated,setUpdated]=useState<Date|null>(null);
+ useEffect(()=>{let live=true;async function load(){try{setErr('');const r=await fetch(`/api/youbike?city=${city}`,{cache:'no-store'});if(!r.ok)throw new Error(String(r.status));const j=await r.json();if(live){setData(j);setUpdated(new Date())}}catch(e){if(live)setErr(String(e))}}load();const t=setInterval(load,60000);return()=>{live=false;clearInterval(t)}},[city]);
  const areas=useMemo(()=>['全部',...Array.from(new Set((data?.stations||[]).map(s=>s.area).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'zh-Hant'))],[data]);
- const filteredStations=useMemo(()=>{
-   let xs=(data?.stations||[]).filter(s=>area==='全部'||s.area===area);
-   if(q.trim()) xs=xs.filter(s=>`${s.name} ${s.address} ${s.area}`.includes(q.trim()));
-   if(mode==='只看問題') xs=xs.filter(s=>s.level!=='ok');
-   if(mode==='可借車多') xs=[...xs].sort((a,b)=>b.bikes-a.bikes);
-   if(mode==='可還位多') xs=[...xs].sort((a,b)=>b.docks-a.docks);
-   return xs;
- },[data,q,area,mode]);
- const stations=filteredStations.slice(0,80);
- const routeCards=useMemo(()=> city==='tainan' ? TOUR_ROUTES.map(route=>({...route,stops:route.stops.map(stop=>({...stop,stations:(data?.stations||[]).filter(s=>stop.keywords.some(k=>`${s.name} ${s.address} ${s.area}`.includes(k))).sort((a,b)=>b.bikes-a.bikes || b.docks-a.docks).slice(0,3)}))})) : [],[city,data]);
- if(err) return <main><div className="error">資料讀取失敗：{err}</div></main>;
+ const routeCards=useMemo(()=>city==='tainan'?TOUR_ROUTES.map(route=>({...route,stops:route.stops.map(stop=>({...stop,stations:(data?.stations||[]).filter(s=>stop.keywords.some(k=>`${s.name} ${s.address} ${s.area}`.includes(k))).sort((a,b)=>b.bikes-a.bikes||b.docks-a.docks).slice(0,3)}))})):[],[city,data]);
+ const routeKeywords=useMemo(()=>selectedRoute==='全部路線'?[]:(TOUR_ROUTES.find(r=>r.name===selectedRoute)?.stops.flatMap(s=>s.keywords)??[]),[selectedRoute]);
+ const filteredStations=useMemo(()=>{let xs=(data?.stations||[]).filter(s=>area==='全部'||s.area===area);if(routeKeywords.length)xs=xs.filter(s=>routeKeywords.some(k=>`${s.name} ${s.address} ${s.area}`.includes(k)));if(q.trim())xs=xs.filter(s=>`${s.name} ${s.address} ${s.area} ${s.id}`.includes(q.trim()));if(mode==='只看問題')xs=xs.filter(s=>s.level!=='ok');if(mode==='可借車多')xs=[...xs].sort((a,b)=>b.bikes-a.bikes);else if(mode==='可還位多')xs=[...xs].sort((a,b)=>b.docks-a.docks);else xs=[...xs].sort((a,b)=>levelScore(b)-levelScore(a)||a.area.localeCompare(b.area,'zh-Hant'));return xs},[data,area,routeKeywords,q,mode]);
+ const stations=filteredStations.slice(0,96); const health=data?Math.round(data.summary.ok/data.count*100):0;
+ if(err)return <main><div className="error">資料讀取失敗：{err}</div></main>;
  return <main>
-  <section className="hero">
-    <div className="heroArt" aria-hidden="true"><img className="heroImg" src="/assets/youbike-tainan-hero-ms4.png" alt=""/><div className="heroShade"/><div className="orb orb1"/><div className="orb orb2"/><div className="mapLine"/></div>
-    <div className="eyebrow">Taiwan mobility intelligence</div>
-    <h1 className="title">台灣 YouBike<br/>即時雷達</h1>
-    <p className="subtitle">一個偏現代產品感的即時交通小儀表板：台南看旅遊路線，台北看通勤站況。站點資料每 60 秒更新，適合拿來測 MS4 的產品工程能力。</p>
-  </section>
-  {!data?<div className="loading">載入即時站點中…</div>:<>
-   <section className="toolbar">
-    <select value={city} onChange={e=>{setCity(e.target.value as 'taipei'|'tainan'); setArea('全部'); setQ('')}}><option value="tainan">台南旅遊雷達</option><option value="taipei">台北通勤雷達</option></select>
-    <input placeholder="搜尋站名、地址或行政區" value={q} onChange={e=>setQ(e.target.value)}/>
-    <select value={area} onChange={e=>setArea(e.target.value)}>{areas.map(a=><option key={a}>{a}</option>)}</select>
-    <select value={mode} onChange={e=>setMode(e.target.value)}>{['問題優先','只看問題','可借車多','可還位多'].map(m=><option key={m}>{m}</option>)}</select>
-   </section>
-   <section className="grid"><Metric n={data.count} label="即時站點"/><Metric n={data.summary.problem} label="需注意站點"/><Metric n={data.summary.noBike} label="無車可借"/><Metric n={data.summary.noDock} label="無位可還"/></section>
-   <section className="card insight"><b>{data.cityName}狀態摘要：</b> 目前共有 {data.count.toLocaleString()} 站，{data.summary.problem.toLocaleString()} 站需要注意；目前篩選顯示 <b>{filteredStations.length.toLocaleString()}</b> 站；無車 {data.summary.noBike} 站、無位 {data.summary.noDock} 站{data.summary.eBikes ? `，可借電輔車 ${data.summary.eBikes} 台` : ''}。{area!=='全部' && <button className="ghost" onClick={()=>setArea('全部')}>清除區域：{area}</button>}</section>
-   {city==='tainan'&&<section className="routes">{routeCards.map(route=><article className="route" key={route.id}><div><div className="name">{route.name}</div><div className="area">{route.theme}</div><p>{route.tip}</p></div><div className="routeStops">{route.stops.map(stop=><div className="stop" key={stop.name}><b>{stop.name}</b>{stop.stations.length?stop.stations.map(st=><span key={st.id} className={`mini ${st.level}`}>{st.name}｜借 {st.bikes} 還 {st.docks}</span>):<span className="mini warn">附近站點待人工確認</span>}</div>)}</div></article>)}</section>}
-   <section className="listHeader"><div><b>站點清單</b><span>{area} / {mode}</span></div><span>顯示 {stations.length} / {filteredStations.length}</span></section>
-   <section className="stations">{stations.map(s=><article className="station" key={s.id}><div className="stationHead"><div><div className="name">{s.name}</div><div className="area">{s.area}｜{s.address}</div></div><span className={`pill ${s.level}`}>{s.label}</span></div><div className="bars"><div><div className="label">可借 {s.bikes} / {s.total}</div><div className="bar"><i style={{width:`${s.total?Math.round(s.bikes/s.total*100):0}%`}}/></div></div><div><div className="label">可還 {s.docks} / {s.total}</div><div className="bar"><i style={{width:`${s.total?Math.round(s.docks/s.total*100):0}%`}}/></div></div></div><div className="meta"><span>更新：{s.updatedAt}</span><span>ID：{s.id}</span></div></article>)}</section>
+  <section className="hero"><div className="heroArt" aria-hidden="true"><img className="heroImg" src="/assets/youbike-tainan-hero-ms4.png" alt=""/><div className="heroShade"/><div className="orb orb1"/><div className="orb orb2"/><div className="mapLine"/></div><div className="heroContent"><div className="eyebrow">Taiwan mobility intelligence</div><h1 className="title">YouBike<br/>城市即時雷達</h1><p className="subtitle">台南旅遊、台北通勤，一頁掌握可借車、可還位與異常站點。設計目標：少操作、快判斷、好分享。</p><div className="heroActions"><button className={city==='tainan'?'primary active':'primary'} onClick={()=>{setCity('tainan');setArea('全部');setSelectedRoute('全部路線')}}>台南旅遊模式</button><button className={city==='taipei'?'primary active':'primary'} onClick={()=>{setCity('taipei');setArea('全部');setSelectedRoute('全部路線')}}>台北通勤模式</button></div></div>{data&&<div className="livePanel"><span className="pulse"/>Live · {data.cityName}<b>{data.count.toLocaleString()}</b><small>站點 / 健康度 {health}%</small></div>}</section>
+  {!data?<Skeleton/>:<>
+   <section className="controlDeck"><div className="searchBox"><span>⌕</span><input placeholder="搜尋站名、地址、行政區或 ID" value={q} onChange={e=>setQ(e.target.value)}/>{q&&<button onClick={()=>setQ('')}>清除</button>}</div><div className="segmented">{MODES.map(m=><button key={m} className={mode===m?'on':''} onClick={()=>setMode(m)}>{m}</button>)}</div></section>
+   <section className="chips"><button className={area==='全部'?'chip on':'chip'} onClick={()=>setArea('全部')}>全部區域</button>{areas.filter(a=>a!=='全部').slice(0,18).map(a=><button key={a} className={area===a?'chip on':'chip'} onClick={()=>setArea(a)}>{a}</button>)}</section>
+   <section className="grid"><Metric n={data.count} label="即時站點" tone="blue"/><Metric n={data.summary.problem} label="需注意" tone="warn"/><Metric n={data.summary.noBike} label="無車可借" tone="bad"/><Metric n={data.summary.eBikes||data.summary.noDock} label={data.summary.eBikes?'電輔車':'無位可還'} tone="ok"/></section>
+   <section className="card insight"><div><b>{data.cityName}狀態摘要</b><p>目前篩選顯示 <b>{filteredStations.length.toLocaleString()}</b> / {data.count.toLocaleString()} 站。{updated&&` 更新於 ${updated.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`}。</p></div><button className="ghost" onClick={()=>{setArea('全部');setQ('');setMode('問題優先');setSelectedRoute('全部路線')}}>重設篩選</button></section>
+   {city==='tainan'&&<><section className="sectionTitle"><div><span>Curated routes</span><h2>台南路線快選</h2></div><select value={selectedRoute} onChange={e=>setSelectedRoute(e.target.value)}><option>全部路線</option>{TOUR_ROUTES.map(r=><option key={r.id}>{r.name}</option>)}</select></section><section className="routes">{routeCards.map(route=><article className={selectedRoute===route.name?'route picked':'route'} key={route.id} onClick={()=>setSelectedRoute(selectedRoute===route.name?'全部路線':route.name)}><div><div className="name">{route.name}</div><div className="area">{route.theme}</div><p>{route.tip}</p></div><div className="routeStops">{route.stops.map(stop=><div className="stop" key={stop.name}><b>{stop.name}</b>{stop.stations.length?stop.stations.map(st=><span key={st.id} className={`mini ${st.level}`}>{st.name}｜借 {st.bikes} 還 {st.docks}</span>):<span className="mini warn">附近站點待確認</span>}</div>)}</div></article>)}</section></>}
+   <section className="listHeader"><div><span>Stations</span><b>站點清單</b></div><span>{area} / {mode} / 顯示 {stations.length} of {filteredStations.length}</span></section>
+   {stations.length===0?<div className="empty">沒有符合條件的站點。試著清除區域、路線或搜尋字。</div>:<section className="stations">{stations.map(s=><StationCard key={s.id} s={s}/>)}</section>}
    <p className="footer">資料來源：{data.cityName} YouBike 即時公開資料；每 60 秒自動重抓。Fetched: {new Date(data.fetchedAt).toLocaleString('zh-TW')}</p>
   </>}
- </main>
-}
-function Metric({n,label}:{n:number;label:string}){return <div className="card metricCard"><div className="metric">{n.toLocaleString()}</div><div className="label">{label}</div></div>}
+ </main>}
+function levelScore(s:Station){return s.level==='bad'?3:s.level==='warn'?2:1}
+function Metric({n,label,tone}:{n:number;label:string;tone:string}){return <div className={`card metricCard ${tone}`}><div className="metric">{n.toLocaleString()}</div><div className="label">{label}</div></div>}
+function StationCard({s}:{s:Station}){const bikePct=s.total?Math.round(s.bikes/s.total*100):0,dockPct=s.total?Math.round(s.docks/s.total*100):0;return <article className="station"><div className="stationHead"><div><div className="name">{s.name}</div><div className="area">{s.area}｜{s.address}</div></div><span className={`pill ${s.level}`}>{s.label}</span></div><div className="bars"><div><div className="label">可借 {s.bikes} / {s.total}</div><div className="bar"><i style={{width:`${bikePct}%`}}/></div></div><div><div className="label">可還 {s.docks} / {s.total}</div><div className="bar dock"><i style={{width:`${dockPct}%`}}/></div></div></div><div className="meta"><span>更新：{s.updatedAt}</span><span>ID：{s.id}</span></div></article>}
+function Skeleton(){return <section className="skeleton"><div/><div/><div/></section>}
