@@ -35,7 +35,7 @@ export default function Page(){
  if(err) return <main><div className="error">資料讀取失敗：{err}</div></main>;
  return <main>
   <section className="hero">
-    <div className="heroArt" aria-hidden="true"><div className="orb orb1"/><div className="orb orb2"/><div className="mapLine"/></div>
+    <div className="heroArt" aria-hidden="true"><img className="heroImg" src="/assets/youbike-tainan-hero-ms4.png" alt=""/><div className="heroShade"/><div className="orb orb1"/><div className="orb orb2"/><div className="mapLine"/></div>
     <div className="eyebrow">Taiwan mobility intelligence</div>
     <h1 className="title">台灣 YouBike<br/>即時雷達</h1>
     <p className="subtitle">一個偏現代產品感的即時交通小儀表板：台南看旅遊路線，台北看通勤站況。站點資料每 60 秒更新，適合拿來測 MS4 的產品工程能力。</p>
