@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 const TAIPEI_SOURCE = 'https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json';
-const TAINAN_STATIONS = 'https://tdx.transportdata.tw/api/basic/v2/Bike/Station/City/Tainan?%24format=JSON';
-const TAINAN_AVAILABILITY = 'https://tdx.transportdata.tw/api/basic/v2/Bike/Availability/City/Tainan?%24format=JSON';
+const ALL_YOUBIKE_SOURCE = 'https://apis.youbike.com.tw/json/station-yb2.json';
 
 type Station = {
   id: string;
@@ -29,20 +28,11 @@ type TaipeiRaw = {
   available_return_bikes: number; latitude: number; longitude: number;
 };
 
-type TdxStation = {
-  StationUID: string; StationID: string;
-  StationName?: { Zh_tw?: string };
-  StationAddress?: { Zh_tw?: string };
-  StationPosition?: { PositionLat?: number; PositionLon?: number };
-  BikesCapacity?: number;
-  UpdateTime?: string;
-};
-
-type TdxAvailability = {
-  StationUID: string; StationID: string; ServiceStatus: number;
-  AvailableRentBikes: number; AvailableReturnBikes: number;
-  AvailableRentBikesDetail?: { GeneralBikes?: number; ElectricBikes?: number };
-  SrcUpdateTime?: string; UpdateTime?: string;
+type OfficialStation = {
+  country_code: string; area_code: string; type: number; status: number; station_no: string;
+  name_tw: string; district_tw: string; address_tw: string; parking_spaces: number;
+  available_spaces: number; available_spaces_detail?: { yb1?: number; yb2?: number; eyb?: number };
+  empty_spaces: number; lat: string; lng: string; updated_at: string; time: string;
 };
 
 function tainanArea(address: string) {
@@ -97,38 +87,32 @@ async function getTaipei() {
 }
 
 async function getTainan() {
-  const [stationRes, availabilityRes] = await Promise.all([
-    fetch(TAINAN_STATIONS, { next: { revalidate: 60 } }),
-    fetch(TAINAN_AVAILABILITY, { next: { revalidate: 60 } }),
-  ]);
-  if (!stationRes.ok) throw new Error(`tainan_station_${stationRes.status}`);
-  if (!availabilityRes.ok) throw new Error(`tainan_availability_${availabilityRes.status}`);
-  const stationRows = (await stationRes.json()) as TdxStation[];
-  const availabilityRows = (await availabilityRes.json()) as TdxAvailability[];
-  const stationMap = new Map(stationRows.map((s) => [s.StationUID || s.StationID, s]));
-  const stations = availabilityRows.map((a) => {
-    const st = stationMap.get(a.StationUID || a.StationID);
-    const address = st?.StationAddress?.Zh_tw ?? '台南市';
-    const total = Number(st?.BikesCapacity || a.AvailableRentBikes + a.AvailableReturnBikes || 0);
-    const bikes = Number(a.AvailableRentBikes || 0);
-    const docks = Number(a.AvailableReturnBikes || 0);
+  const res = await fetch(ALL_YOUBIKE_SOURCE, { next: { revalidate: 60 } });
+  if (!res.ok) throw new Error(`youbike_all_${res.status}`);
+  const raw = (await res.json()) as OfficialStation[];
+  const rows = raw.filter((s) => s.country_code === '00' && s.area_code === '13');
+  const stations = rows.map((s) => {
+    const total = Number(s.parking_spaces || 0);
+    const bikes = Number(s.available_spaces || 0);
+    const docks = Number(s.empty_spaces || 0);
     return {
-      id: a.StationID,
-      name: (st?.StationName?.Zh_tw ?? a.StationID).replace('YouBike2.0_', ''),
-      area: tainanArea(address),
-      address,
+      id: s.station_no,
+      name: s.name_tw,
+      area: s.district_tw || tainanArea(s.address_tw),
+      address: s.address_tw,
       total,
       bikes,
       docks,
-      updatedAt: a.UpdateTime || a.SrcUpdateTime || st?.UpdateTime || '',
-      lat: Number(st?.StationPosition?.PositionLat || 0),
-      lng: Number(st?.StationPosition?.PositionLon || 0),
-      eBikes: Number(a.AvailableRentBikesDetail?.ElectricBikes || 0),
-      ...statusOf(total, bikes, docks, a.ServiceStatus === 1),
+      updatedAt: s.updated_at || s.time,
+      lat: Number(s.lat),
+      lng: Number(s.lng),
+      eBikes: Number(s.available_spaces_detail?.eyb || 0),
+      ...statusOf(total, bikes, docks, s.status === 1),
     } satisfies Station;
   });
-  return { city: 'tainan', cityName: '台南', source: `${TAINAN_STATIONS} + ${TAINAN_AVAILABILITY}`, stations };
+  return { city: 'tainan', cityName: '台南', source: `${ALL_YOUBIKE_SOURCE} (area_code=13)`, stations };
 }
+
 
 export async function GET(req: NextRequest) {
   try {
