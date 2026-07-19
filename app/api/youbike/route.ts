@@ -41,21 +41,21 @@ function tainanArea(address: string) {
 }
 
 function statusOf(total: number, bikes: number, docks: number, active = true) {
-  if (!active) return { level: 'bad' as const, label: '暫停營運', score: 100 };
-  if (bikes === 0) return { level: 'bad' as const, label: '無車可借', score: 95 };
-  if (docks === 0) return { level: 'bad' as const, label: '無位可還', score: 90 };
+  if (!active) return { level: 'bad' as const, label: '暫停服務', score: 100 };
+  if (bikes === 0) return { level: 'bad' as const, label: '現在沒車', score: 95 };
+  if (docks === 0) return { level: 'bad' as const, label: '目前滿站', score: 90 };
   const rentRatio = total ? bikes / total : 0;
   const returnRatio = total ? docks / total : 0;
-  if (rentRatio < 0.15) return { level: 'warn' as const, label: '車輛偏少', score: 70 };
-  if (returnRatio < 0.15) return { level: 'warn' as const, label: '空位偏少', score: 65 };
-  return { level: 'ok' as const, label: '供需正常', score: 20 };
+  if (rentRatio < 0.15) return { level: 'warn' as const, label: '快沒車', score: 70 };
+  if (returnRatio < 0.15) return { level: 'warn' as const, label: '快滿站', score: 65 };
+  return { level: 'ok' as const, label: '供需穩定', score: 20 };
 }
 
 function summarize(stations: Station[]) {
   return {
     problem: stations.filter((s) => s.level !== 'ok').length,
-    noBike: stations.filter((s) => s.label === '無車可借').length,
-    noDock: stations.filter((s) => s.label === '無位可還').length,
+    noBike: stations.filter((s) => s.label === '現在沒車').length,
+    noDock: stations.filter((s) => s.label === '目前滿站').length,
     ok: stations.filter((s) => s.level === 'ok').length,
     eBikes: stations.reduce((sum, s) => sum + (s.eBikes ?? 0), 0),
   };
